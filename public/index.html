@@ -188,8 +188,13 @@ const $=id=>document.getElementById(id);
 let ws=null,me=null,myGold=50,myWins=0,myLosses=0,myOwned=['peasant'],myOutfit='peasant';
 let OUTFITS=[],players=[],duel=null,myHp=30,foeHp=30,lockedMove=null;
 let pendingIncoming=null,challengeTarget=null,selStake=10,pitState='free',challengerName=null,lastResultTxt='';
-function connect(){const proto=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(proto+'//'+location.host);
+let pendingAuth=null;
+function connect(authMsg){if(authMsg)pendingAuth=authMsg;
+  if(ws&&(ws.readyState===0||ws.readyState===1)){if(ws.readyState===1&&pendingAuth){ws.send(JSON.stringify(pendingAuth));pendingAuth=null;}return;}
+  const proto=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(proto+'//'+location.host);
+  ws.onopen=()=>{if(pendingAuth){ws.send(JSON.stringify(pendingAuth));pendingAuth=null;}};
   ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data)}catch(e){return}handle(m);};
+  ws.onerror=()=>{if(!me)$('authErr').textContent='Could not connect to the server — check your connection and tap again.';};
   ws.onclose=()=>{setTimeout(()=>{if(me)connect();},2000);};}
 function send(o){if(ws&&ws.readyState===1)ws.send(JSON.stringify(o));}
 function handle(m){
@@ -412,8 +417,8 @@ function lockMove(mv){if(!duel)return;lockedMove=mv;send({type:'duelMove',move:m
   $('lockPip').innerHTML='Locked: <span class="mv-'+mv+'">'+(mv==='melee'?'🗡️':mv==='magic'?'✨':'🏹')+' '+MOVE_NAMES[mv]+'</span>';}
 document.addEventListener('keydown',e=>{if(!me||duel===null&&['1','2','3'].includes(e.key))return;
   if(e.key==='1')lockMove('melee');if(e.key==='2')lockMove('magic');if(e.key==='3')lockMove('range');});
-$('btnLogin').addEventListener('click',()=>{connect();setTimeout(()=>send({type:'login',username:$('authName').value,password:$('authPw').value}),300);});
-$('btnRegister').addEventListener('click',()=>{connect();setTimeout(()=>send({type:'register',username:$('authName').value,password:$('authPw').value}),300);});
+$('btnLogin').addEventListener('click',()=>{$('authErr').textContent='Connecting…';connect({type:'login',username:$('authName').value,password:$('authPw').value});});
+$('btnRegister').addEventListener('click',()=>{$('authErr').textContent='Connecting…';connect({type:'register',username:$('authName').value,password:$('authPw').value});});
 
 /* ===== movement: joystick (primary), WASD, tap-to-walk; over-the-shoulder follow cam, drag to orbit ===== */
 const myPos={x:0,z:24};let myRot=Math.PI,camYaw=Math.PI,walkTarget=null;const keys={};
